@@ -1,0 +1,125 @@
+#!/usr/bin/env python
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Made by Davide 'oldmammuth' Del Papa
+# Public Domain
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+import math
+import argparse
+
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# FUNCTIONS
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Adapted from: 
+# https://wiki.openstreetmap.org/wiki/Slippy_map_tilenames#Python
+
+def longlat2tile(args):
+    #print (args) #debug
+    longitude = args.coordinates[0]
+    latitude = args.coordinates[1]
+    if args.zoom:
+        zoom = args.zoom
+    else:
+        zoom = 12
+    lat_rad = math.radians(latitude)
+    n = 2.0 ** zoom
+    xtile = int((longitude + 180.0) / 360.0 * n)
+    ytile = int((1.0 - math.log(math.tan(lat_rad) + (1 / math.cos(lat_rad))) / math.pi) / 2.0 * n)
+    if args.verbose:
+        print( "Tiles for zoom %d: %d %d" % (zoom, xtile, ytile) )
+        print( "Path for slippy map: %d/%d/%d.{ext}" % (zoom, xtile, ytile) )
+    else:
+        print("%d %d [z%d]" % (xtile, ytile, zoom))
+
+def tile2longlat(args):
+    x = args.tiles[0]
+    y = args.tiles[1]
+    infix = " " # little hack for a nice explanation
+    if args.zoom:
+        zoom = args.zoom
+    else:
+        zoom = 12
+    # Normally the func returns the NW corner of the tile; option centertile gets the coordinates of the tile's center
+    if args.centertile:
+        x = x+0.5
+        y = y+ 0.5
+        infix = " at the tile's center "
+    n = 2.0 ** zoom
+    lon_deg = x / n * 360.0 - 180.0
+    lat_rad = math.atan(math.sinh(math.pi * (1 - 2 * y / n)))
+    lat_deg = math.degrees(lat_rad)
+    if args.verbose:
+        print( "Coordinates%sfor zoom %d: %f %f" % (infix, zoom, lon_deg, lat_deg))
+    else:
+        print("%f %f" % (lon_deg, lat_deg))
+
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# COMMAND LINE PARSER
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+# main parser
+parser = argparse.ArgumentParser(
+    prog='ctrans',
+    description='Web Map utility. Gets you the tile corresponding to (Longitude, Latitude), or gets you the (Longitude, latitude) corresponding to the given tile.',
+    epilog='%(prog)s 0.1 - Public Domain - Based on algos found on https://wiki.openstreetmap.org/wiki/Slippy_map_tilenames#Python'
+)
+parser.add_argument('--version', action='version', version='%(prog)s 0.1')
+# Common parser
+commonopt = argparse.ArgumentParser(add_help=False)
+# zoom option
+commonopt.add_argument(
+    "-z",
+    "--zoom",
+    help='WebMap zoom level, default=12',
+    type=int,
+    default=12
+    )
+# verbose option
+commonopt.add_argument(
+    "-v",
+    "--verbose",
+    help='Set Verbose Output',
+    action='store_true'
+    )
+# parser for tile options
+tileopt = argparse.ArgumentParser(add_help=False)
+tileopt.add_argument(
+    "coordinates",
+    nargs=2,
+    type=float,
+    help='<Longitude> <Latitude>',
+    )
+
+# parser for longlat options
+longlatopt = argparse.ArgumentParser(add_help=False)
+longlatopt.add_argument(
+    "tiles",
+    nargs=2,
+    type=float,
+    help='<X> <Y>'
+    )
+longlatopt.add_argument(
+    "-c",
+    "--centertile",
+    action='store_true',
+    help='Returns the coorninates taken at the center of the tile, instead of NW corner (default behaviour)'
+    )
+
+# Add subparsers
+sp = parser.add_subparsers()
+sp_2tile = sp.add_parser(
+    'l2t', 
+    parents=[tileopt, commonopt],
+    description='Gets you the X and Y coordinates on a web map for the given Longitude and Latitude',
+    help='Returns a tile reference for a Long Lat input. Type l2t -h for more options.'
+    )
+sp_2longlat = sp.add_parser(
+    't2l', 
+    parents=[longlatopt, commonopt],
+    description="Gets you the Longitude and Latitude coordinates for the given web map's tile",
+    help="Returnns the Long Lat coordinates of the NW corner of the given tile. Type t2l -h for more options."
+    )
+sp_2tile.set_defaults(func=longlat2tile)
+sp_2longlat.set_defaults(func=tile2longlat)
+args = parser.parse_args()
+args.func(args)
